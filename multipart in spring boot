@@ -1,0 +1,105 @@
+@RequestMapping(value="/filemanage",method=RequestMethod.POST)
+	public HashMap<String,Object> FileManageSave(@RequestParam("file") MultipartFile file) throws IOException {
+		HashMap<String,Object> res = new HashMap<String,Object>();
+		ObjectMapper objMapper = new ObjectMapper();
+		
+    //================================ set http client ================================
+		CloseableHttpClient closeableHttp = HttpClients.createDefault();
+		HttpPost httpPost = new HttpPost("http://localhost:8888/m1_java_springboot/filemanage/base64upload");
+		
+    ////================================ process convert file to base64 string //================================
+		InputStream inputStrm = file.getInputStream();
+		BufferedInputStream bufferFile = new BufferedInputStream(inputStrm);
+		byte[] byteBuffer = ByteStreams.toByteArray(bufferFile);
+		String base64File = Base64.encodeBase64String(byteBuffer);
+		
+		HashMap<String,Object> mapParams = new HashMap<String,Object>(){
+			{
+				put("file",base64File);
+				put("data","from api gatewa");
+			}
+		};
+		
+		String Params = objMapper.writeValueAsString(mapParams);
+		
+//		ArrayList<NameValuePair> postParams = new ArrayList<NameValuePair>();
+//		postParams.add(new BasicNameValuePair("file",base64File));
+//		httpPost.setEntity(new UrlEncodedFormEntity(postParams));
+		
+		httpPost.setEntity(new StringEntity(Params));
+		httpPost.addHeader("Authorization", this.httpRequest.getHeader("Authorization"));
+		httpPost.addHeader("Content-Type","application/json");
+		
+		
+		 CloseableHttpResponse response = closeableHttp.execute(httpPost);
+		 String content = EntityUtils.toString(response.getEntity());
+		 HashMap<String,Object> convContent = objMapper.readValue(content, HashMap.class);
+		 response.close();
+		 res.put("data", content);
+		
+		return res;
+		
+	}
+  
+  
+  
+  //============================================== upload file ==============================================
+  	@RequestMapping(value="/save",method=RequestMethod.POST)
+	public HashMap<String,Object> SaveFile(@RequestParam("file") MultipartFile file){
+		HashMap<String,Object> result = new HashMap<String,Object>();
+		
+		try {
+			
+			//cara 1
+			long startTime1 = System.nanoTime();
+
+			byte[] fileByte = file.getBytes();
+			
+			long endTime1 = System.nanoTime();
+			
+			long processTime1 = endTime1 - startTime1;
+			
+			
+			//cara2
+			long startTime2 = System.nanoTime();
+			
+      //add to stream
+			InputStream fileInputStream2 = file.getInputStream();
+      //add to buffer
+			BufferedInputStream bufferInputStream2 = new BufferedInputStream(fileInputStream2);
+      //convert buffer to array
+			byte[] fileByte2 = ByteStreams.toByteArray(bufferInputStream2);
+			
+			long endTime2 = System.nanoTime();
+			long processTime2 = endTime2 - startTime2;
+			
+			result.put("data1", Base64.encodeBase64String(fileByte));
+			result.put("process_time1", processTime1);
+			
+			File f = new File(this.env.getProperty("file.upload-dir")+file.getOriginalFilename());
+			
+      //mulai nyimpen file, cek dulu filenya udah ada apa belom
+			if(f.exists()) {
+				result.put("status", "file has been exists");
+			}else if(!f.exists()) {
+				FileOutputStream fout = new FileOutputStream(this.env.getProperty("file.upload-dir")+file.getOriginalFilename());
+				fout.write(fileByte2);
+			}
+			
+			
+      //set response ke client
+			result.put("data2", Base64.encodeBase64String(fileByte2));
+			result.put("process_time2", processTime2);
+			System.out.println("=================== encode 1 ===================");
+			System.out.println(Base64.encodeBase64String(fileByte));
+			System.out.println("=================== encode 2 ===================");
+			System.out.println(Base64.encodeBase64String(fileByte2));
+			System.out.println("file name = "+file.getOriginalFilename());
+
+		}
+		catch(Exception e) {
+			result.put("error", e.getMessage());
+		}
+		
+		return result;
+	}
